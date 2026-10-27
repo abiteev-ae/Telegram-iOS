@@ -1005,6 +1005,15 @@ renderer stamps each laid-out run with its node and flat range so a selection ma
 node-id scheme is shared by the enumerator and the V2 layout and nothing checks the pair. Details
 in [`docs/instantpage-richtext.md`](docs/instantpage-richtext.md) under "Rich reply quotes".
 
+## Chat history summary (debug)
+
+Internal prototype: chat-list long-press → **Chat Summary**. Behind Debug Settings ▸
+**Chat: history summary (debug)** (`ExperimentalUISettings.mockChatHistorySummary`). Empty
+**Summary Key** uses the mock provider; a non-empty key hits an OpenAI-compatible
+`/chat/completions` host (URL / model / max messages are sibling Debug rows). Not gated on unread —
+summarizes the last N messages. How to enable, test mock vs live LLM, sheet interactions, and the
+JSON contract: [`docs/chat-history-summary.md`](docs/chat-history-summary.md).
+
 ## Rust MTProto engine on iOS
 
 The Rust MTProto engine (`third-party/mtproto-engine`, Swift wrapper `submodules/MTProtoRustEngine`)

@@ -88,11 +88,15 @@ public struct ExperimentalUISettings: Codable, Equatable {
     public var forceRLottieBackend: Bool
     public var respectSystemMicrophone: Bool
     public var springSendAnimation: Bool
+    /// Debug Settings ▸ "Chat: history summary (debug)": chat-list long-press → Chat Summary.
+    /// See `docs/chat-history-summary.md`.
     public var mockChatHistorySummary: Bool
-    /// OpenAI-compatible base URL for the debug unread-summary provider (`…/chat/completions`).
+    /// OpenAI-compatible base URL for the debug summary provider (`…/chat/completions`).
     public var chatHistorySummaryBaseURL: String
+    /// Empty → mock provider; non-empty → live LLM with this bearer token.
     public var chatHistorySummaryApiKey: String
     public var chatHistorySummaryModel: String
+    /// How many recent messages to load (clamped 1…100 in Debug Settings).
     public var chatHistorySummaryMaxMessages: Int32
     /// Debug Settings ▸ "Wallet: fake transfers", offered to dev accounts only (and only honoured for them): a send
     /// from the transfer form sends nothing and closes as a registered transfer would, against a fixed balance.
