@@ -11,9 +11,7 @@ final class ChatHistorySummaryTests: XCTestCase {
     func testResultMovesLoadingStateToReady() {
         let summary = ChatHistorySummary(
             overview: "Overview",
-            sections: [
-                ChatHistorySummary.Section(kind: .keyPoints, text: "Key point", citation: nil)
-            ],
+            keyPoints: [ChatHistorySummary.Item(text: "Key point")],
             coveredMessageCount: 12
         )
 
@@ -32,7 +30,7 @@ final class ChatHistorySummaryTests: XCTestCase {
             state: loading,
             event: .result(
                 requestId: 2,
-                summary: ChatHistorySummary(overview: "", sections: [], coveredMessageCount: 0)
+                summary: ChatHistorySummary(overview: "", coveredMessageCount: 0)
             )
         )
 
@@ -43,7 +41,6 @@ final class ChatHistorySummaryTests: XCTestCase {
         let loading = ChatHistorySummaryState.loading(requestId: 3)
         let staleSummary = ChatHistorySummary(
             overview: "Stale",
-            sections: [],
             coveredMessageCount: 1
         )
 
@@ -68,7 +65,7 @@ final class ChatHistorySummaryTests: XCTestCase {
         )
     }
 
-    func testMockProviderUsesPreviewMessageForCitation() {
+    func testMockProviderReturnsBulletsAndSuggestedReplies() {
         let messageId = EngineMessage.Id(peerId: self.peerId, namespace: Namespaces.Message.Cloud, id: 10)
         let request = ChatHistorySummaryRequest(
             peerId: self.peerId,
@@ -81,7 +78,11 @@ final class ChatHistorySummaryTests: XCTestCase {
 
         let disposable = provider.summary(request: request).start(next: { summary in
             XCTAssertEqual(summary.coveredMessageCount, 30)
-            XCTAssertEqual(summary.sections.first?.citation?.messageId, messageId)
+            XCTAssertFalse(summary.keyPoints.isEmpty)
+            XCTAssertFalse(summary.actionItems.isEmpty)
+            XCTAssertEqual(summary.suggestedReplies.count, 2)
+            XCTAssertEqual(summary.keyPoints.first?.messageId, messageId)
+            XCTAssertFalse(summary.copyableText.isEmpty)
             expectation.fulfill()
         })
 
@@ -89,25 +90,21 @@ final class ChatHistorySummaryTests: XCTestCase {
         disposable.dispose()
     }
 
-    func testParsesSummaryPayloadAndDropsUnknownCitations() {
+    func testParsesItemObjectsAndPlainStrings() {
+        let longReply = String(repeating: "a", count: 200)
         let payload: [String: Any] = [
             "overview": "Team aligned on the release.",
-            "sections": [
-                [
-                    "kind": "keyPoints",
-                    "text": "Ship on Friday.",
-                    "citationMessageId": 10
-                ],
-                [
-                    "kind": "decisions",
-                    "text": "Keep the current scope.",
-                    "citationMessageId": 999
-                ],
-                [
-                    "kind": "unknown",
-                    "text": "Should be ignored"
-                ]
-            ]
+            "keyPoints": [
+                ["text": "Ship on Friday.", "citationMessageId": 10],
+                "Update release notes.",
+                ["text": "  "],
+                ["text": "Unknown citation", "citationMessageId": 999]
+            ],
+            "decisions": [
+                ["text": "Keep the current scope.", "citationMessageId": 11]
+            ],
+            "actionItems": ["Verify critical flows."],
+            "suggestedReplies": ["Sounds good.", longReply, "Third", "Fourth ignored"]
         ]
 
         let summary = parseChatHistorySummaryPayload(
@@ -120,18 +117,24 @@ final class ChatHistorySummaryTests: XCTestCase {
 
         XCTAssertEqual(summary?.overview, "Team aligned on the release.")
         XCTAssertEqual(summary?.coveredMessageCount, 4)
-        XCTAssertEqual(summary?.sections.count, 2)
-        XCTAssertEqual(summary?.sections[0].kind, .keyPoints)
+        XCTAssertEqual(summary?.keyPoints.count, 3)
+        XCTAssertEqual(summary?.keyPoints[0].text, "Ship on Friday.")
         XCTAssertEqual(
-            summary?.sections[0].citation?.messageId,
+            summary?.keyPoints[0].messageId,
             EngineMessage.Id(peerId: self.peerId, namespace: Namespaces.Message.Cloud, id: 10)
         )
-        XCTAssertEqual(summary?.sections[1].kind, .decisions)
-        XCTAssertNil(summary?.sections[1].citation)
+        XCTAssertEqual(summary?.keyPoints[1].text, "Update release notes.")
+        XCTAssertNil(summary?.keyPoints[1].messageId)
+        XCTAssertEqual(summary?.keyPoints[2].text, "Unknown citation")
+        XCTAssertNil(summary?.keyPoints[2].messageId)
+        XCTAssertEqual(summary?.decisions.first?.messageId?.id, 11)
+        XCTAssertEqual(summary?.actionItems.first?.text, "Verify critical flows.")
+        XCTAssertEqual(summary?.suggestedReplies.count, 3)
+        XCTAssertEqual(summary?.suggestedReplies[1].count, 120)
     }
 
     func testExtractsOpenAIChatCompletionJSONContent() throws {
-        let nested = #"{"overview":"Hi","sections":[]}"#
+        let nested = #"{"overview":"Hi","keyPoints":[],"decisions":[],"actionItems":[],"suggestedReplies":[]}"#
         let envelope: [String: Any] = [
             "choices": [
                 [

@@ -14,6 +14,221 @@ import ListActionItemComponent
 import GlassBarButtonComponent
 import BundleIconComponent
 import ItemListUI
+import ShimmerEffect
+import LottieComponent
+import LottieSettings
+
+private final class ChatHistorySummaryTitleComponent: Component {
+    let theme: PresentationTheme
+    let title: String
+    let isProcessing: Bool
+    let lottieSettings: LottieRenderingSettings
+
+    init(
+        theme: PresentationTheme,
+        title: String,
+        isProcessing: Bool,
+        lottieSettings: LottieRenderingSettings
+    ) {
+        self.theme = theme
+        self.title = title
+        self.isProcessing = isProcessing
+        self.lottieSettings = lottieSettings
+    }
+
+    static func ==(lhs: ChatHistorySummaryTitleComponent, rhs: ChatHistorySummaryTitleComponent) -> Bool {
+        if lhs.theme !== rhs.theme {
+            return false
+        }
+        if lhs.title != rhs.title {
+            return false
+        }
+        if lhs.isProcessing != rhs.isProcessing {
+            return false
+        }
+        return true
+    }
+
+    final class View: UIView {
+        private var animationIcon: ComponentView<Empty>?
+        private let title = ComponentView<Empty>()
+
+        func update(component: ChatHistorySummaryTitleComponent, availableSize: CGSize, transition: ComponentTransition) -> CGSize {
+            let titleSize = self.title.update(
+                transition: .immediate,
+                component: AnyComponent(MultilineTextComponent(
+                    text: .plain(NSAttributedString(
+                        string: component.title,
+                        font: Font.semibold(17.0),
+                        textColor: component.theme.list.itemPrimaryTextColor
+                    )),
+                    maximumNumberOfLines: 1
+                )),
+                environment: {},
+                containerSize: CGSize(width: availableSize.width, height: 100.0)
+            )
+            let titleFrame = CGRect(origin: .zero, size: titleSize)
+            if let titleView = self.title.view {
+                if titleView.superview == nil {
+                    titleView.isUserInteractionEnabled = false
+                    self.addSubview(titleView)
+                }
+                titleView.frame = titleFrame
+            }
+
+            if component.isProcessing {
+                let animationIcon: ComponentView<Empty>
+                var animationIconTransition = transition
+                if let current = self.animationIcon {
+                    animationIcon = current
+                } else {
+                    animationIconTransition = animationIconTransition.withAnimation(.none)
+                    animationIcon = ComponentView()
+                    self.animationIcon = animationIcon
+                }
+
+                let animationIconSize = animationIcon.update(
+                    transition: animationIconTransition,
+                    component: AnyComponent(LottieComponent(
+                        content: LottieComponent.AppBundleContent(name: "SparklesEmoji"),
+                        placeholderColor: nil,
+                        startingPosition: .begin,
+                        size: CGSize(width: 30.0, height: 30.0),
+                        loop: true,
+                        lottieSettings: component.lottieSettings
+                    )),
+                    environment: {},
+                    containerSize: CGSize(width: 30.0, height: 30.0)
+                )
+                let animationIconFrame = CGRect(
+                    origin: CGPoint(
+                        x: titleFrame.maxX + 4.0,
+                        y: titleFrame.minY + floorToScreenPixels((titleFrame.height - animationIconSize.height) * 0.5) - 2.0
+                    ),
+                    size: animationIconSize
+                )
+                if let animationIconView = animationIcon.view {
+                    if animationIconView.superview == nil {
+                        self.addSubview(animationIconView)
+                        animationIconView.alpha = 0.0
+                    }
+                    animationIconTransition.setFrame(view: animationIconView, frame: animationIconFrame)
+                    transition.setAlpha(view: animationIconView, alpha: 1.0)
+                }
+            } else if let animationIcon = self.animationIcon {
+                self.animationIcon = nil
+                if let animationIconView = animationIcon.view {
+                    transition.setAlpha(view: animationIconView, alpha: 0.0, completion: { [weak animationIconView] _ in
+                        animationIconView?.removeFromSuperview()
+                    })
+                }
+            }
+
+            return CGSize(
+                width: titleSize.width + (component.isProcessing ? 34.0 : 0.0),
+                height: titleSize.height
+            )
+        }
+    }
+
+    func makeView() -> View {
+        return View(frame: CGRect())
+    }
+
+    func update(view: View, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: ComponentTransition) -> CGSize {
+        return view.update(component: self, availableSize: availableSize, transition: transition)
+    }
+}
+
+private final class ChatHistorySummarySkeletonItemComponent: Component {
+    let theme: PresentationTheme
+    let lineWidths: [CGFloat]
+
+    init(theme: PresentationTheme, lineWidths: [CGFloat]) {
+        self.theme = theme
+        self.lineWidths = lineWidths
+    }
+
+    static func ==(lhs: ChatHistorySummarySkeletonItemComponent, rhs: ChatHistorySummarySkeletonItemComponent) -> Bool {
+        if lhs.theme !== rhs.theme {
+            return false
+        }
+        if lhs.lineWidths != rhs.lineWidths {
+            return false
+        }
+        return true
+    }
+
+    final class View: UIView, ListSectionComponent.ChildView {
+        private let shimmerEffectNode = ShimmerEffectNode()
+        private var absoluteLocation: (CGRect, CGSize)?
+
+        var customUpdateIsHighlighted: ((Bool) -> Void)?
+        var enumerateSiblings: (((UIView) -> Void) -> Void)?
+        var separatorInset: CGFloat = 0.0
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            self.addSubview(self.shimmerEffectNode.view)
+        }
+
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        func updateAbsoluteRect(_ rect: CGRect, within containerSize: CGSize) {
+            self.absoluteLocation = (rect, containerSize)
+            self.shimmerEffectNode.updateAbsoluteRect(rect, within: containerSize)
+        }
+
+        func update(component: ChatHistorySummarySkeletonItemComponent, availableSize: CGSize, transition: ComponentTransition) -> CGSize {
+            let horizontalInset: CGFloat = 16.0
+            let topInset: CGFloat = 16.0
+            let lineHeight: CGFloat = 10.0
+            let lineSpacing: CGFloat = 12.0
+            let contentWidth = max(1.0, availableSize.width - horizontalInset * 2.0)
+            let height = topInset * 2.0 + CGFloat(component.lineWidths.count) * lineHeight
+                + CGFloat(max(0, component.lineWidths.count - 1)) * lineSpacing
+
+            var shapes: [ShimmerEffectNode.Shape] = []
+            var y = topInset
+            for widthFraction in component.lineWidths {
+                let width = floor(contentWidth * min(1.0, max(0.2, widthFraction)))
+                shapes.append(.roundedRectLine(
+                    startPoint: CGPoint(x: horizontalInset, y: y),
+                    width: width,
+                    diameter: lineHeight
+                ))
+                y += lineHeight + lineSpacing
+            }
+
+            let size = CGSize(width: availableSize.width, height: max(52.0, height))
+            transition.setFrame(view: self.shimmerEffectNode.view, frame: CGRect(origin: .zero, size: size))
+            if let absoluteLocation = self.absoluteLocation {
+                self.shimmerEffectNode.updateAbsoluteRect(absoluteLocation.0, within: absoluteLocation.1)
+            } else {
+                self.shimmerEffectNode.updateAbsoluteRect(CGRect(origin: .zero, size: size), within: size)
+            }
+            self.shimmerEffectNode.update(
+                backgroundColor: component.theme.list.itemBlocksBackgroundColor,
+                foregroundColor: component.theme.list.mediaPlaceholderColor,
+                shimmeringColor: component.theme.list.itemBlocksBackgroundColor.withAlphaComponent(0.4),
+                shapes: shapes,
+                size: size
+            )
+            self.separatorInset = horizontalInset
+            return size
+        }
+    }
+
+    func makeView() -> View {
+        return View(frame: CGRect())
+    }
+
+    func update(view: View, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: ComponentTransition) -> CGSize {
+        return view.update(component: self, availableSize: availableSize, transition: transition)
+    }
+}
 
 private final class ChatHistorySummaryContentComponent: Component {
     typealias EnvironmentType = ViewControllerComponentContainer.Environment
@@ -22,20 +237,23 @@ private final class ChatHistorySummaryContentComponent: Component {
     let peerTitle: String
     let summaryState: ChatHistorySummaryState
     let retry: () -> Void
-    let openMessage: (EngineMessage.Id) -> Void
+    let presentItemMenu: (UIView, String, EngineMessage.Id?) -> Void
+    let useSuggestedReply: (String) -> Void
 
     init(
         context: AccountContext,
         peerTitle: String,
         summaryState: ChatHistorySummaryState,
         retry: @escaping () -> Void,
-        openMessage: @escaping (EngineMessage.Id) -> Void
+        presentItemMenu: @escaping (UIView, String, EngineMessage.Id?) -> Void,
+        useSuggestedReply: @escaping (String) -> Void
     ) {
         self.context = context
         self.peerTitle = peerTitle
         self.summaryState = summaryState
         self.retry = retry
-        self.openMessage = openMessage
+        self.presentItemMenu = presentItemMenu
+        self.useSuggestedReply = useSuggestedReply
     }
 
     static func ==(lhs: ChatHistorySummaryContentComponent, rhs: ChatHistorySummaryContentComponent) -> Bool {
@@ -78,7 +296,10 @@ private final class ChatHistorySummaryContentComponent: Component {
             id: AnyHashable,
             text: String,
             theme: PresentationTheme,
-            fontSize: CGFloat
+            fontSize: CGFloat,
+            leftIcon: ListActionItemComponent.LeftIcon? = nil,
+            action: ((UIView) -> Void)? = nil,
+            highlighting: ListActionItemComponent.Highlighting = .disabled
         ) -> AnyComponentWithIdentity<Empty> {
             return AnyComponentWithIdentity(id: id, component: AnyComponent(ListActionItemComponent(
                 theme: theme,
@@ -89,9 +310,10 @@ private final class ChatHistorySummaryContentComponent: Component {
                     color: theme.list.itemPrimaryTextColor
                 ),
                 contentInsets: UIEdgeInsets(top: 14.0, left: 0.0, bottom: 14.0, right: 0.0),
+                leftIcon: leftIcon,
                 accessory: nil,
-                action: nil,
-                highlighting: .disabled
+                action: action,
+                highlighting: highlighting
             )))
         }
 
@@ -109,7 +331,7 @@ private final class ChatHistorySummaryContentComponent: Component {
                     title,
                     font: Font.regular(fontSize),
                     color: theme.list.itemAccentColor,
-                    maximumNumberOfLines: 1
+                    maximumNumberOfLines: 0
                 ),
                 accessory: .arrow,
                 action: { _ in
@@ -153,20 +375,21 @@ private final class ChatHistorySummaryContentComponent: Component {
                         theme: theme,
                         style: .glass,
                         header: makeHeader(component.peerTitle),
-                        footer: nil,
+                        footer: self.textComponent(
+                            environmentValue.strings.ChatList_HistorySummary_Loading,
+                            font: Font.regular(13.0),
+                            color: theme.list.freeTextColor
+                        ),
                         items: [
-                            AnyComponentWithIdentity(id: "loading", component: AnyComponent(ListActionItemComponent(
-                                theme: theme,
-                                style: .glass,
-                                title: self.textComponent(
-                                    environmentValue.strings.ChatList_HistorySummary_Loading,
-                                    font: Font.regular(fontSize),
-                                    color: theme.list.itemSecondaryTextColor
-                                ),
-                                accessory: .activity,
-                                action: nil,
-                                highlighting: .disabled
-                            )))
+                            AnyComponentWithIdentity(id: "skeleton-overview", component: AnyComponent(
+                                ChatHistorySummarySkeletonItemComponent(theme: theme, lineWidths: [0.92, 0.78, 0.55])
+                            )),
+                            AnyComponentWithIdentity(id: "skeleton-points", component: AnyComponent(
+                                ChatHistorySummarySkeletonItemComponent(theme: theme, lineWidths: [0.84, 0.66])
+                            )),
+                            AnyComponentWithIdentity(id: "skeleton-actions", component: AnyComponent(
+                                ChatHistorySummarySkeletonItemComponent(theme: theme, lineWidths: [0.74, 0.58])
+                            ))
                         ]
                     )
                 ))
@@ -178,11 +401,7 @@ private final class ChatHistorySummaryContentComponent: Component {
                         theme: theme,
                         style: .glass,
                         header: makeHeader(environmentValue.strings.ChatList_HistorySummary_Overview),
-                        footer: self.textComponent(
-                            environmentValue.strings.ChatList_HistorySummary_DemoNotice,
-                            font: Font.regular(13.0),
-                            color: theme.list.freeTextColor
-                        ),
+                        footer: nil,
                         items: [
                             AnyComponentWithIdentity(id: "overview", component: AnyComponent(ListActionItemComponent(
                                 theme: theme,
@@ -202,52 +421,112 @@ private final class ChatHistorySummaryContentComponent: Component {
                                 ], alignment: .left, spacing: 7.0)),
                                 contentInsets: UIEdgeInsets(top: 14.0, left: 0.0, bottom: 14.0, right: 0.0),
                                 accessory: nil,
-                                action: nil,
-                                highlighting: .disabled
+                                action: { sourceView in
+                                    component.presentItemMenu(sourceView, summary.copyableText, nil)
+                                },
+                                highlighting: .default
                             )))
                         ]
                     )
                 ))
 
-                for (index, summarySection) in summary.sections.enumerated() {
-                    let title: String
-                    switch summarySection.kind {
-                    case .keyPoints:
-                        title = environmentValue.strings.ChatList_HistorySummary_KeyPoints
-                    case .decisions:
-                        title = environmentValue.strings.ChatList_HistorySummary_Decisions
-                    case .actionItems:
-                        title = environmentValue.strings.ChatList_HistorySummary_ActionItems
-                    }
-
-                    var items: [AnyComponentWithIdentity<Empty>] = [
-                        self.bodyItem(
-                            id: "body",
-                            text: summarySection.text,
-                            theme: theme,
-                            fontSize: fontSize
-                        )
-                    ]
-                    if let citation = summarySection.citation {
-                        items.append(self.actionItem(
-                            id: "citation",
-                            title: citation.title,
-                            theme: theme,
-                            fontSize: fontSize,
-                            action: {
-                                component.openMessage(citation.messageId)
-                            }
-                        ))
-                    }
-
+                if !summary.keyPoints.isEmpty {
                     sectionComponents.append((
-                        "section-\(index)",
+                        "keyPoints",
                         ListSectionComponent(
                             theme: theme,
                             style: .glass,
-                            header: makeHeader(title),
+                            header: makeHeader(environmentValue.strings.ChatList_HistorySummary_KeyPoints),
                             footer: nil,
-                            items: items
+                            items: summary.keyPoints.enumerated().map { index, item in
+                                self.bodyItem(
+                                    id: "key-\(index)",
+                                    text: "• \(item.text)",
+                                    theme: theme,
+                                    fontSize: fontSize,
+                                    action: { sourceView in
+                                        component.presentItemMenu(sourceView, item.text, item.messageId)
+                                    },
+                                    highlighting: .default
+                                )
+                            }
+                        )
+                    ))
+                }
+
+                if !summary.decisions.isEmpty {
+                    sectionComponents.append((
+                        "decisions",
+                        ListSectionComponent(
+                            theme: theme,
+                            style: .glass,
+                            header: makeHeader(environmentValue.strings.ChatList_HistorySummary_Decisions),
+                            footer: nil,
+                            items: summary.decisions.enumerated().map { index, item in
+                                self.bodyItem(
+                                    id: "decision-\(index)",
+                                    text: "• \(item.text)",
+                                    theme: theme,
+                                    fontSize: fontSize,
+                                    action: { sourceView in
+                                        component.presentItemMenu(sourceView, item.text, item.messageId)
+                                    },
+                                    highlighting: .default
+                                )
+                            }
+                        )
+                    ))
+                }
+
+                if !summary.actionItems.isEmpty {
+                    sectionComponents.append((
+                        "actionItems",
+                        ListSectionComponent(
+                            theme: theme,
+                            style: .glass,
+                            header: makeHeader(environmentValue.strings.ChatList_HistorySummary_ActionItems),
+                            footer: nil,
+                            items: summary.actionItems.enumerated().map { index, item in
+                                self.bodyItem(
+                                    id: "action-\(index)",
+                                    text: item.text,
+                                    theme: theme,
+                                    fontSize: fontSize,
+                                    leftIcon: .check(ListActionItemComponent.LeftIcon.Check(
+                                        style: .round,
+                                        isSelected: false,
+                                        isEnabled: true,
+                                        toggle: nil
+                                    )),
+                                    action: { sourceView in
+                                        component.presentItemMenu(sourceView, item.text, item.messageId)
+                                    },
+                                    highlighting: .default
+                                )
+                            }
+                        )
+                    ))
+                }
+
+                if !summary.suggestedReplies.isEmpty {
+                    sectionComponents.append((
+                        "suggestedReplies",
+                        ListSectionComponent(
+                            theme: theme,
+                            style: .glass,
+                            header: makeHeader(environmentValue.strings.ChatList_HistorySummary_SuggestedReplies),
+                            footer: nil,
+                            items: summary.suggestedReplies.enumerated().map { index, text in
+                                self.actionItem(
+                                    id: "reply-\(index)",
+                                    title: text,
+                                    theme: theme,
+                                    fontSize: fontSize,
+                                    action: {
+                                        component.useSuggestedReply(text)
+                                    }
+                                )
+                            }
                         )
                     ))
                 }
@@ -366,19 +645,22 @@ private final class ChatHistorySummarySheetComponent: Component {
     let request: ChatHistorySummaryRequest
     let provider: any ChatHistorySummaryProviding
     let openMessage: (EngineMessage.Id) -> Void
+    let openChatWithDraft: (String) -> Void
 
     init(
         context: AccountContext,
         peerTitle: String,
         request: ChatHistorySummaryRequest,
         provider: any ChatHistorySummaryProviding,
-        openMessage: @escaping (EngineMessage.Id) -> Void
+        openMessage: @escaping (EngineMessage.Id) -> Void,
+        openChatWithDraft: @escaping (String) -> Void
     ) {
         self.context = context
         self.peerTitle = peerTitle
         self.request = request
         self.provider = provider
         self.openMessage = openMessage
+        self.openChatWithDraft = openChatWithDraft
     }
 
     static func ==(lhs: ChatHistorySummarySheetComponent, rhs: ChatHistorySummarySheetComponent) -> Bool {
@@ -480,6 +762,14 @@ private final class ChatHistorySummarySheetComponent: Component {
                 self.requestSummary(notify: false)
             }
 
+            let isLoading: Bool
+            switch self.summaryState {
+            case .idle, .loading:
+                isLoading = true
+            default:
+                isLoading = false
+            }
+
             let dismiss: (Bool) -> Void = { [weak self] animated in
                 guard let self, !self.isDismissing else {
                     return
@@ -512,18 +802,64 @@ private final class ChatHistorySummarySheetComponent: Component {
                         retry: { [weak self] in
                             self?.requestSummary()
                         },
-                        openMessage: { messageId in
+                        presentItemMenu: { sourceView, text, messageId in
+                            guard let hostController = controller() else {
+                                return
+                            }
+                            let strings = environmentValue.strings
+                            var actions: [ContextMenuAction] = [
+                                ContextMenuAction(
+                                    content: .text(
+                                        title: strings.ChatList_HistorySummary_Copy,
+                                        accessibilityLabel: strings.ChatList_HistorySummary_Copy
+                                    ),
+                                    action: {
+                                        UIPasteboard.general.string = text
+                                    }
+                                )
+                            ]
+                            if let messageId {
+                                actions.append(ContextMenuAction(
+                                    content: .text(
+                                        title: strings.ChatList_HistorySummary_OpenMessage,
+                                        accessibilityLabel: strings.ChatList_HistorySummary_OpenMessage
+                                    ),
+                                    action: {
+                                        dismiss(true)
+                                        component.openMessage(messageId)
+                                    }
+                                ))
+                            }
+                            let menuController = makeContextMenuController(
+                                actions: actions,
+                                hasHapticFeedback: true
+                            )
+                            hostController.present(
+                                menuController,
+                                in: .window(.root),
+                                with: ContextMenuControllerPresentationArguments(sourceViewAndRect: { [weak sourceView, weak hostController] in
+                                    guard let sourceView, let hostController else {
+                                        return nil
+                                    }
+                                    return (
+                                        sourceView,
+                                        sourceView.bounds.insetBy(dx: 0.0, dy: 2.0),
+                                        hostController.view,
+                                        hostController.view.bounds
+                                    )
+                                })
+                            )
+                        },
+                        useSuggestedReply: { draft in
                             dismiss(true)
-                            component.openMessage(messageId)
+                            component.openChatWithDraft(draft)
                         }
                     )),
-                    titleItem: AnyComponent(MultilineTextComponent(
-                        text: .plain(NSAttributedString(
-                            string: environmentValue.strings.ChatList_HistorySummary_Title,
-                            font: Font.semibold(17.0),
-                            textColor: theme.list.itemPrimaryTextColor
-                        )),
-                        maximumNumberOfLines: 1
+                    titleItem: AnyComponent(ChatHistorySummaryTitleComponent(
+                        theme: theme,
+                        title: environmentValue.strings.ChatList_HistorySummary_Title,
+                        isProcessing: isLoading,
+                        lottieSettings: component.context.lottieRenderingSettings
                     )),
                     leftItem: AnyComponent(GlassBarButtonComponent(
                         size: CGSize(width: 44.0, height: 44.0),
@@ -606,7 +942,8 @@ public final class ChatHistorySummaryScreen: ViewControllerComponentContainer {
         peerTitle: String,
         request: ChatHistorySummaryRequest,
         provider: any ChatHistorySummaryProviding,
-        openMessage: @escaping (EngineMessage.Id) -> Void
+        openMessage: @escaping (EngineMessage.Id) -> Void,
+        openChatWithDraft: @escaping (String) -> Void
     ) {
         super.init(
             context: context,
@@ -615,7 +952,8 @@ public final class ChatHistorySummaryScreen: ViewControllerComponentContainer {
                 peerTitle: peerTitle,
                 request: request,
                 provider: provider,
-                openMessage: openMessage
+                openMessage: openMessage,
+                openChatWithDraft: openChatWithDraft
             ),
             navigationBarAppearance: .none
         )

@@ -454,6 +454,21 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                                                         ),
                                                         keepStack: .always
                                                     ))
+                                                },
+                                                openChatWithDraft: { [weak chatListController] draft in
+                                                    guard let navigationController = chatListController?.navigationController as? NavigationController else {
+                                                        return
+                                                    }
+                                                    context.sharedContext.navigateToChatController(NavigateToChatControllerParams(
+                                                        navigationController: navigationController,
+                                                        context: context,
+                                                        chatLocation: .peer(peer),
+                                                        updateTextInputState: ChatTextInputState(
+                                                            inputText: NSAttributedString(string: draft)
+                                                        ),
+                                                        activateInput: .text,
+                                                        keepStack: .always
+                                                    ))
                                                 }
                                             )
                                             chatListController?.present(controller, in: .window(.root))

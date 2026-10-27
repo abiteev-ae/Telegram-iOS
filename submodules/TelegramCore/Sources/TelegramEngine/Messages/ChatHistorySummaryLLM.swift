@@ -68,38 +68,133 @@ public func parseChatHistorySummaryPayload(
     knownMessageIds: Set<Int32>
 ) -> ChatHistorySummary? {
     let overview = (object["overview"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    let rawSections = object["sections"] as? [[String: Any]] ?? []
+    let keyPoints = parseChatHistorySummaryItemList(
+        object["keyPoints"],
+        peerId: peerId,
+        messageNamespace: messageNamespace,
+        knownMessageIds: knownMessageIds,
+        limit: 6,
+        maxItemLength: 500
+    )
+    let decisions = parseChatHistorySummaryItemList(
+        object["decisions"],
+        peerId: peerId,
+        messageNamespace: messageNamespace,
+        knownMessageIds: knownMessageIds,
+        limit: 6,
+        maxItemLength: 500
+    )
+    let actionItems = parseChatHistorySummaryItemList(
+        object["actionItems"],
+        peerId: peerId,
+        messageNamespace: messageNamespace,
+        knownMessageIds: knownMessageIds,
+        limit: 6,
+        maxItemLength: 500
+    )
+    let suggestedReplies = parseChatHistorySummaryStringList(object["suggestedReplies"], limit: 3, maxItemLength: 120)
 
-    var sections: [ChatHistorySummary.Section] = []
-    for raw in rawSections {
-        guard let kind = parseChatHistorySummarySectionKind(raw["kind"] as? String) else {
-            continue
-        }
-        let text = (raw["text"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if text.isEmpty {
-            continue
-        }
-
-        var citation: ChatHistorySummary.Citation?
-        if let citationId = parseCitationMessageId(raw["citationMessageId"]), knownMessageIds.contains(citationId) {
-            citation = ChatHistorySummary.Citation(
-                title: "Open message",
-                messageId: EngineMessage.Id(peerId: peerId, namespace: messageNamespace, id: citationId)
-            )
-        }
-
-        sections.append(ChatHistorySummary.Section(kind: kind, text: text, citation: citation))
-    }
-
-    if overview.isEmpty && sections.isEmpty {
-        return ChatHistorySummary(overview: "", sections: [], coveredMessageCount: 0)
-    }
-
-    return ChatHistorySummary(
+    let summary = ChatHistorySummary(
         overview: overview,
-        sections: sections,
+        keyPoints: keyPoints,
+        decisions: decisions,
+        actionItems: actionItems,
+        suggestedReplies: suggestedReplies,
         coveredMessageCount: coveredMessageCount
     )
+    if summary.isEmpty {
+        return ChatHistorySummary(overview: "", coveredMessageCount: 0)
+    }
+    return summary
+}
+
+private func parseChatHistorySummaryStringList(_ value: Any?, limit: Int, maxItemLength: Int) -> [String] {
+    guard let rawItems = value as? [Any] else {
+        return []
+    }
+    var result: [String] = []
+    for raw in rawItems {
+        guard result.count < limit else {
+            break
+        }
+        guard let string = raw as? String else {
+            continue
+        }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            continue
+        }
+        if trimmed.count > maxItemLength {
+            result.append(String(trimmed.prefix(maxItemLength)))
+        } else {
+            result.append(trimmed)
+        }
+    }
+    return result
+}
+
+private func parseChatHistorySummaryItemList(
+    _ value: Any?,
+    peerId: EnginePeer.Id,
+    messageNamespace: MessageId.Namespace,
+    knownMessageIds: Set<Int32>,
+    limit: Int,
+    maxItemLength: Int
+) -> [ChatHistorySummary.Item] {
+    guard let rawItems = value as? [Any] else {
+        return []
+    }
+    var result: [ChatHistorySummary.Item] = []
+    for raw in rawItems {
+        guard result.count < limit else {
+            break
+        }
+
+        let text: String
+        var citationId: Int32?
+        if let string = raw as? String {
+            text = string
+        } else if let object = raw as? [String: Any] {
+            text = (object["text"] as? String) ?? ""
+            citationId = parseCitationMessageId(object["citationMessageId"])
+        } else {
+            continue
+        }
+
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            continue
+        }
+        let clipped: String
+        if trimmed.count > maxItemLength {
+            clipped = String(trimmed.prefix(maxItemLength))
+        } else {
+            clipped = trimmed
+        }
+
+        var messageId: EngineMessage.Id?
+        if let citationId, knownMessageIds.contains(citationId) {
+            messageId = EngineMessage.Id(peerId: peerId, namespace: messageNamespace, id: citationId)
+        }
+        result.append(ChatHistorySummary.Item(text: clipped, messageId: messageId))
+    }
+    return result
+}
+
+private func parseCitationMessageId(_ value: Any?) -> Int32? {
+    if let number = value as? Int32 {
+        return number
+    }
+    if let number = value as? Int {
+        return Int32(number)
+    }
+    if let number = value as? NSNumber {
+        return number.int32Value
+    }
+    if let string = value as? String, let number = Int32(string) {
+        return number
+    }
+    return nil
 }
 
 public func extractOpenAIChatCompletionContent(data: Data) -> Data? {
@@ -268,7 +363,7 @@ public final class DebugLLMChatHistorySummaryProvider: ChatHistorySummaryProvidi
         |> castError(ChatHistorySummaryError.self)
         |> mapToSignal { messages -> Signal<ChatHistorySummary, ChatHistorySummaryError> in
             if messages.isEmpty {
-                return .single(ChatHistorySummary(overview: "", sections: [], coveredMessageCount: 0))
+                return .single(ChatHistorySummary(overview: "", coveredMessageCount: 0))
             }
 
             guard let urlRequest = makeOpenAIChatHistorySummaryRequest(
@@ -323,35 +418,6 @@ public final class DebugLLMChatHistorySummaryProvider: ChatHistorySummaryProvidi
     }
 }
 
-private func parseChatHistorySummarySectionKind(_ raw: String?) -> ChatHistorySummary.Section.Kind? {
-    switch raw {
-    case "keyPoints":
-        return .keyPoints
-    case "decisions":
-        return .decisions
-    case "actionItems":
-        return .actionItems
-    default:
-        return nil
-    }
-}
-
-private func parseCitationMessageId(_ value: Any?) -> Int32? {
-    if let number = value as? Int32 {
-        return number
-    }
-    if let number = value as? Int {
-        return Int32(number)
-    }
-    if let number = value as? NSNumber {
-        return number.int32Value
-    }
-    if let string = value as? String, let number = Int32(string) {
-        return number
-    }
-    return nil
-}
-
 private func makeOpenAIChatHistorySummaryRequest(
     baseURL: String,
     apiKey: String,
@@ -367,17 +433,18 @@ private func makeOpenAIChatHistorySummaryRequest(
     }.joined(separator: "\n")
 
     let systemPrompt = """
-    You summarize unread Telegram chat messages for a user who was away.
+    You summarize recent Telegram chat messages so the user can catch up quickly.
     Reply with JSON only, no markdown fences, matching this schema:
-    {"overview":"string","sections":[{"kind":"keyPoints|decisions|actionItems","text":"string","citationMessageId":123}]}
+    {"overview":"string","keyPoints":[{"text":"string","citationMessageId":123}],"decisions":[{"text":"string","citationMessageId":123}],"actionItems":[{"text":"string","citationMessageId":123}],"suggestedReplies":["string"]}
     Rules:
-    - overview: 1-3 sentences covering the chat while the user was away.
-    - sections: 0-7 items. kind must be one of keyPoints, decisions, actionItems.
-    - citationMessageId is optional and must be one of the numeric ids in square brackets from the transcript.
+    - overview: 1-3 sentences covering the recent conversation.
+    - keyPoints / decisions / actionItems: up to 6 items each. Prefer objects with text; citationMessageId is optional and must be one of the numeric ids in square brackets from the transcript.
+    - Plain strings are also accepted for those arrays.
+    - decisions / actionItems may be empty arrays.
+    - suggestedReplies: 2-3 short ready-to-send reply phrases (each under 120 characters).
     - Match the language of the messages.
     - Do not invent facts that are not in the transcript.
     """
-
     // Avoid response_format — many OpenRouter free models reject it with 400.
     let body: [String: Any] = [
         "model": model,
