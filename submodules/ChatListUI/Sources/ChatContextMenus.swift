@@ -414,6 +414,22 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                                                 unreadCount: readCounters.count,
                                                 previewMessageIds: summaryPreviewMessageIds
                                             )
+                                            let experimentalSettings = context.sharedContext.immediateExperimentalUISettings
+                                            let apiKey = experimentalSettings.chatHistorySummaryApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            let provider: any ChatHistorySummaryProviding
+                                            if apiKey.isEmpty {
+                                                provider = MockChatHistorySummaryProvider()
+                                            } else {
+                                                provider = DebugLLMChatHistorySummaryProvider(
+                                                    account: context.account,
+                                                    config: DebugLLMChatHistorySummaryConfig(
+                                                        baseURL: experimentalSettings.chatHistorySummaryBaseURL,
+                                                        apiKey: apiKey,
+                                                        model: experimentalSettings.chatHistorySummaryModel,
+                                                        maxMessages: Int(experimentalSettings.chatHistorySummaryMaxMessages)
+                                                    )
+                                                )
+                                            }
                                             let controller = ChatHistorySummaryScreen(
                                                 context: context,
                                                 peerTitle: peer.displayTitle(
@@ -421,7 +437,7 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                                                     displayOrder: presentationData.nameDisplayOrder
                                                 ),
                                                 request: request,
-                                                provider: MockChatHistorySummaryProvider(),
+                                                provider: provider,
                                                 openMessage: { [weak chatListController] messageId in
                                                     guard let navigationController = chatListController?.navigationController as? NavigationController else {
                                                         return

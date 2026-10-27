@@ -89,6 +89,11 @@ public struct ExperimentalUISettings: Codable, Equatable {
     public var respectSystemMicrophone: Bool
     public var springSendAnimation: Bool
     public var mockChatHistorySummary: Bool
+    /// OpenAI-compatible base URL for the debug unread-summary provider (`…/chat/completions`).
+    public var chatHistorySummaryBaseURL: String
+    public var chatHistorySummaryApiKey: String
+    public var chatHistorySummaryModel: String
+    public var chatHistorySummaryMaxMessages: Int32
     /// Debug Settings ▸ "Wallet: fake transfers", offered to dev accounts only (and only honoured for them): a send
     /// from the transfer form sends nothing and closes as a registered transfer would, against a fixed balance.
     public var fakeWalletTransfers: Bool
@@ -152,6 +157,10 @@ public struct ExperimentalUISettings: Codable, Equatable {
             respectSystemMicrophone: false,
             springSendAnimation: false,
             mockChatHistorySummary: false,
+            chatHistorySummaryBaseURL: "https://openrouter.ai/api/v1",
+            chatHistorySummaryApiKey: "",
+            chatHistorySummaryModel: "openrouter/free",
+            chatHistorySummaryMaxMessages: 30,
             fakeWalletTransfers: false,
             useModernVideoMessagePipeline: nil,
             showCrashReportAlerts: nil
@@ -213,6 +222,10 @@ public struct ExperimentalUISettings: Codable, Equatable {
         respectSystemMicrophone: Bool,
         springSendAnimation: Bool,
         mockChatHistorySummary: Bool = false,
+        chatHistorySummaryBaseURL: String = "https://openrouter.ai/api/v1",
+        chatHistorySummaryApiKey: String = "",
+        chatHistorySummaryModel: String = "openrouter/free",
+        chatHistorySummaryMaxMessages: Int32 = 30,
         fakeWalletTransfers: Bool,
         useModernVideoMessagePipeline: Bool? = nil,
         videoMessageCameraMode: VideoMessageCameraMode = .hdBilinear,
@@ -272,6 +285,10 @@ public struct ExperimentalUISettings: Codable, Equatable {
         self.respectSystemMicrophone = respectSystemMicrophone
         self.springSendAnimation = springSendAnimation
         self.mockChatHistorySummary = mockChatHistorySummary
+        self.chatHistorySummaryBaseURL = chatHistorySummaryBaseURL
+        self.chatHistorySummaryApiKey = chatHistorySummaryApiKey
+        self.chatHistorySummaryModel = chatHistorySummaryModel
+        self.chatHistorySummaryMaxMessages = chatHistorySummaryMaxMessages
         self.fakeWalletTransfers = fakeWalletTransfers
         self.showCrashReportAlerts = showCrashReportAlerts
         self.useModernVideoMessagePipeline = useModernVideoMessagePipeline
@@ -337,6 +354,10 @@ public struct ExperimentalUISettings: Codable, Equatable {
         self.respectSystemMicrophone = try container.decodeIfPresent(Bool.self, forKey: "respectSystemMicrophone") ?? false
         self.springSendAnimation = try container.decodeIfPresent(Bool.self, forKey: "springSendAnimation") ?? false
         self.mockChatHistorySummary = try container.decodeIfPresent(Bool.self, forKey: "mockChatHistorySummary") ?? false
+        self.chatHistorySummaryBaseURL = try container.decodeIfPresent(String.self, forKey: "chatHistorySummaryBaseURL") ?? "https://openrouter.ai/api/v1"
+        self.chatHistorySummaryApiKey = try container.decodeIfPresent(String.self, forKey: "chatHistorySummaryApiKey") ?? ""
+        self.chatHistorySummaryModel = try container.decodeIfPresent(String.self, forKey: "chatHistorySummaryModel") ?? "openrouter/free"
+        self.chatHistorySummaryMaxMessages = try container.decodeIfPresent(Int32.self, forKey: "chatHistorySummaryMaxMessages") ?? 30
         self.fakeWalletTransfers = try container.decodeIfPresent(Bool.self, forKey: "fakeWalletTransfers") ?? false
         self.showCrashReportAlerts = try container.decodeIfPresent(Bool.self, forKey: "showCrashReportAlerts")
         self.useModernVideoMessagePipeline = try container.decodeIfPresent(Bool.self, forKey: "useModernVideoMessagePipeline")
@@ -400,6 +421,10 @@ public struct ExperimentalUISettings: Codable, Equatable {
         try container.encodeIfPresent(self.respectSystemMicrophone, forKey: "respectSystemMicrophone")
         try container.encodeIfPresent(self.springSendAnimation, forKey: "springSendAnimation")
         try container.encodeIfPresent(self.mockChatHistorySummary, forKey: "mockChatHistorySummary")
+        try container.encode(self.chatHistorySummaryBaseURL, forKey: "chatHistorySummaryBaseURL")
+        try container.encode(self.chatHistorySummaryApiKey, forKey: "chatHistorySummaryApiKey")
+        try container.encode(self.chatHistorySummaryModel, forKey: "chatHistorySummaryModel")
+        try container.encode(self.chatHistorySummaryMaxMessages, forKey: "chatHistorySummaryMaxMessages")
         try container.encodeIfPresent(self.fakeWalletTransfers, forKey: "fakeWalletTransfers")
         try container.encodeIfPresent(self.showCrashReportAlerts, forKey: "showCrashReportAlerts")
         try container.encodeIfPresent(self.useModernVideoMessagePipeline, forKey: "useModernVideoMessagePipeline")

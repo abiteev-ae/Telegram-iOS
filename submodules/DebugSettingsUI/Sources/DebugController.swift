@@ -736,6 +736,10 @@ private enum DebugControllerEntry: ItemListNodeEntry {
     case springSendAnimation(Bool)
     case fakeWalletTransfers(Bool)
     case mockChatHistorySummary(Bool)
+    case chatHistorySummaryBaseURL(String)
+    case chatHistorySummaryApiKey(String)
+    case chatHistorySummaryModel(String)
+    case chatHistorySummaryMaxMessages(String)
     case forceRLottieBackend(Bool)
     case respectSystemMicrophone(Bool)
     case useModernVideoMessagePipeline(Bool)
@@ -789,7 +793,7 @@ private enum DebugControllerEntry: ItemListNodeEntry {
             return DebugControllerSection.experiments.rawValue
         case .crash, .resetBiometricsData, .photoPreview, .knockoutWallpaper, .compressedEmojiCache, .storiesJpegExperiment, .checkSerializedData, .enableQuickReactionSwitch, .experimentalCompatibility, .enableDebugDataDisplay, .fakeGlass, .forceClearGlass, .debugRipple, .inputDecEngineEditor, .coreListChatBackend, .forceRLottieBackend, .respectSystemMicrophone, .useModernVideoMessagePipeline, .videoMessageCameraMode, .browserExperiment, .allForumsHaveTabs, .enableReactionOverrides, .disableReloginTokens, .liveStreamV2, .experimentalCallMute, .groupCallReferenceEngine, .playerV2, .devRequests, .enableUpdates, .pwa, .enableLocalTranslation, .testPasscodeMigration:
             return DebugControllerSection.experiments.rawValue
-        case .inputDecTextBackend, .springSendAnimation, .fakeWalletTransfers, .mockChatHistorySummary:
+        case .inputDecTextBackend, .springSendAnimation, .fakeWalletTransfers, .mockChatHistorySummary, .chatHistorySummaryBaseURL, .chatHistorySummaryApiKey, .chatHistorySummaryModel, .chatHistorySummaryMaxMessages:
             return DebugControllerSection.experiments.rawValue
         case .logTranslationRecognition, .resetTranslationStates:
             return DebugControllerSection.translation.rawValue
@@ -951,6 +955,14 @@ private enum DebugControllerEntry: ItemListNodeEntry {
         case .mockChatHistorySummary:
             // Appended right after `fakeWalletTransfers`; see the ordering note above.
             return 75
+        case .chatHistorySummaryBaseURL:
+            return 76
+        case .chatHistorySummaryApiKey:
+            return 77
+        case .chatHistorySummaryModel:
+            return 78
+        case .chatHistorySummaryMaxMessages:
+            return 79
         case .disableVideoAspectScaling:
             return 104
         case .enableNetworkFramework:
@@ -1462,7 +1474,7 @@ private enum DebugControllerEntry: ItemListNodeEntry {
                 }).start()
             })
         case let .mockChatHistorySummary(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Chat: mock unread summary", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Chat: unread summary (debug)", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 let _ = arguments.sharedContext.accountManager.transaction ({ transaction in
                     transaction.updateSharedData(ApplicationSpecificSharedDataKeys.experimentalUISettings, { settings in
                         var settings = settings?.get(ExperimentalUISettings.self) ?? ExperimentalUISettings.defaultSettings
@@ -1471,6 +1483,55 @@ private enum DebugControllerEntry: ItemListNodeEntry {
                     })
                 }).start()
             })
+        case let .chatHistorySummaryBaseURL(value):
+            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: NSAttributedString(string: "Summary URL", textColor: presentationData.theme.list.itemPrimaryTextColor), text: value, placeholder: "https://openrouter.ai/api/v1", type: .regular(capitalization: false, autocorrection: false), clearType: .always, sectionId: self.section, textUpdated: { updatedText in
+                let _ = arguments.sharedContext.accountManager.transaction ({ transaction in
+                    transaction.updateSharedData(ApplicationSpecificSharedDataKeys.experimentalUISettings, { settings in
+                        var settings = settings?.get(ExperimentalUISettings.self) ?? ExperimentalUISettings.defaultSettings
+                        settings.chatHistorySummaryBaseURL = updatedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        return EnginePreferencesEntry(settings)
+                    })
+                }).start()
+            }, action: {})
+        case let .chatHistorySummaryApiKey(value):
+            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: NSAttributedString(string: "Summary Key", textColor: presentationData.theme.list.itemPrimaryTextColor), text: value, placeholder: "sk-…", type: .password, clearType: .always, sectionId: self.section, textUpdated: { updatedText in
+                let _ = arguments.sharedContext.accountManager.transaction ({ transaction in
+                    transaction.updateSharedData(ApplicationSpecificSharedDataKeys.experimentalUISettings, { settings in
+                        var settings = settings?.get(ExperimentalUISettings.self) ?? ExperimentalUISettings.defaultSettings
+                        settings.chatHistorySummaryApiKey = updatedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        return EnginePreferencesEntry(settings)
+                    })
+                }).start()
+            }, action: {})
+        case let .chatHistorySummaryModel(value):
+            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: NSAttributedString(string: "Summary Model", textColor: presentationData.theme.list.itemPrimaryTextColor), text: value, placeholder: "openrouter/free", type: .regular(capitalization: false, autocorrection: false), clearType: .always, sectionId: self.section, textUpdated: { updatedText in
+                let _ = arguments.sharedContext.accountManager.transaction ({ transaction in
+                    transaction.updateSharedData(ApplicationSpecificSharedDataKeys.experimentalUISettings, { settings in
+                        var settings = settings?.get(ExperimentalUISettings.self) ?? ExperimentalUISettings.defaultSettings
+                        settings.chatHistorySummaryModel = updatedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        return EnginePreferencesEntry(settings)
+                    })
+                }).start()
+            }, action: {})
+        case let .chatHistorySummaryMaxMessages(value):
+            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: NSAttributedString(string: "Summary Max Msgs", textColor: presentationData.theme.list.itemPrimaryTextColor), text: value, placeholder: "30", type: .number, clearType: .always, sectionId: self.section, textUpdated: { updatedText in
+                let parsed = Int32(updatedText).flatMap { value -> Int32? in
+                    if value < 1 {
+                        return 1
+                    }
+                    if value > 100 {
+                        return 100
+                    }
+                    return value
+                } ?? 30
+                let _ = arguments.sharedContext.accountManager.transaction ({ transaction in
+                    transaction.updateSharedData(ApplicationSpecificSharedDataKeys.experimentalUISettings, { settings in
+                        var settings = settings?.get(ExperimentalUISettings.self) ?? ExperimentalUISettings.defaultSettings
+                        settings.chatHistorySummaryMaxMessages = parsed
+                        return EnginePreferencesEntry(settings)
+                    })
+                }).start()
+            }, action: {})
         case let .forceRLottieBackend(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Lottie: force rlottie", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 let _ = arguments.sharedContext.accountManager.transaction ({ transaction in
@@ -2003,6 +2064,12 @@ private func debugControllerEntries(context: AccountContext?, sharedContext: Sha
             entries.append(.fakeWalletTransfers(experimentalSettings.fakeWalletTransfers))
         }
         entries.append(.mockChatHistorySummary(experimentalSettings.mockChatHistorySummary))
+        if experimentalSettings.mockChatHistorySummary {
+            entries.append(.chatHistorySummaryBaseURL(experimentalSettings.chatHistorySummaryBaseURL))
+            entries.append(.chatHistorySummaryApiKey(experimentalSettings.chatHistorySummaryApiKey))
+            entries.append(.chatHistorySummaryModel(experimentalSettings.chatHistorySummaryModel))
+            entries.append(.chatHistorySummaryMaxMessages("\(experimentalSettings.chatHistorySummaryMaxMessages)"))
+        }
         
         entries.append(.logTranslationRecognition(experimentalSettings.logLanguageRecognition))
         entries.append(.resetTranslationStates)
