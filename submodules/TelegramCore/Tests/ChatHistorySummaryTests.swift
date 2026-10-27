@@ -73,14 +73,14 @@ final class ChatHistorySummaryTests: XCTestCase {
         let request = ChatHistorySummaryRequest(
             peerId: self.peerId,
             threadId: nil,
-            unreadCount: 300,
+            messageLimit: 30,
             previewMessageIds: [messageId]
         )
         let provider = MockChatHistorySummaryProvider(delay: 0.0)
         let expectation = self.expectation(description: "Mock summary")
 
         let disposable = provider.summary(request: request).start(next: { summary in
-            XCTAssertEqual(summary.coveredMessageCount, 300)
+            XCTAssertEqual(summary.coveredMessageCount, 30)
             XCTAssertEqual(summary.sections.first?.citation?.messageId, messageId)
             expectation.fulfill()
         })

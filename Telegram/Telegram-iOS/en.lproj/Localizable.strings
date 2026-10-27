@@ -15726,8 +15726,8 @@ Error: %8$@";
 
 "Conversation.Summary.Limit.Title" = "AI Summary";
 "Conversation.Summary.Limit.Text" = "Summarize large messages with AI – unlimited with Telegram Premium.";
-"ChatList.HistorySummary.Menu" = "Unread Summary";
-"ChatList.HistorySummary.Title" = "Unread Summary";
+"ChatList.HistorySummary.Menu" = "Chat Summary";
+"ChatList.HistorySummary.Title" = "Chat Summary";
 "ChatList.HistorySummary.Loading" = "Preparing a short summary…";
 "ChatList.HistorySummary.Overview" = "Overview";
 "ChatList.HistorySummary.KeyPoints" = "Key Points";

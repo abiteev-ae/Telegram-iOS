@@ -4,18 +4,19 @@ import SwiftSignalKit
 public struct ChatHistorySummaryRequest: Equatable {
     public let peerId: EnginePeer.Id
     public let threadId: Int64?
-    public let unreadCount: Int32
+    /// How many recent messages (read or unread) to consider.
+    public let messageLimit: Int32
     public let previewMessageIds: [EngineMessage.Id]
 
     public init(
         peerId: EnginePeer.Id,
         threadId: Int64?,
-        unreadCount: Int32,
+        messageLimit: Int32,
         previewMessageIds: [EngineMessage.Id]
     ) {
         self.peerId = peerId
         self.threadId = threadId
-        self.unreadCount = unreadCount
+        self.messageLimit = messageLimit
         self.previewMessageIds = previewMessageIds
     }
 }
@@ -168,7 +169,7 @@ public final class MockChatHistorySummaryProvider: ChatHistorySummaryProviding {
                         citation: nil
                     )
                 ],
-                coveredMessageCount: max(1, request.unreadCount)
+                coveredMessageCount: max(1, request.messageLimit)
             ))
         case .empty:
             signal = .single(ChatHistorySummary(overview: "", sections: [], coveredMessageCount: 0))

@@ -85,14 +85,14 @@ func canDisplayMockChatHistorySummary(
     isInternalBuild: Bool,
     isEnabled: Bool,
     isChatListSource: Bool,
-    hasUnreadMessages: Bool,
     isCommunity: Bool,
     isPromo: Bool
 ) -> Bool {
+    // Not gated on unread: opening a chat clears the badge, so unread would
+    // hide the action right when a summary is most useful.
     return isInternalBuild
         && isEnabled
         && isChatListSource
-        && hasUnreadMessages
         && !isCommunity
         && !isPromo
 }
@@ -394,7 +394,6 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                                 isInternalBuild: context.sharedContext.applicationBindings.appBuildType == .internal,
                                 isEnabled: context.sharedContext.immediateExperimentalUISettings.mockChatHistorySummary,
                                 isChatListSource: isChatListSource,
-                                hasUnreadMessages: readCounters.count > 0,
                                 isCommunity: isCommunity,
                                 isPromo: promoInfo != nil
                             ) {
@@ -408,13 +407,14 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                                     },
                                     action: { c, _ in
                                         c?.dismiss(completion: {
+                                            let experimentalSettings = context.sharedContext.immediateExperimentalUISettings
+                                            let messageLimit = max(1, Int(experimentalSettings.chatHistorySummaryMaxMessages))
                                             let request = ChatHistorySummaryRequest(
                                                 peerId: peerId,
                                                 threadId: nil,
-                                                unreadCount: readCounters.count,
+                                                messageLimit: Int32(messageLimit),
                                                 previewMessageIds: summaryPreviewMessageIds
                                             )
-                                            let experimentalSettings = context.sharedContext.immediateExperimentalUISettings
                                             let apiKey = experimentalSettings.chatHistorySummaryApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
                                             let provider: any ChatHistorySummaryProviding
                                             if apiKey.isEmpty {
@@ -426,7 +426,7 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                                                         baseURL: experimentalSettings.chatHistorySummaryBaseURL,
                                                         apiKey: apiKey,
                                                         model: experimentalSettings.chatHistorySummaryModel,
-                                                        maxMessages: Int(experimentalSettings.chatHistorySummaryMaxMessages)
+                                                        maxMessages: messageLimit
                                                     )
                                                 )
                                             }
