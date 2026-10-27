@@ -14,6 +14,7 @@ import PremiumUI
 import TelegramPresentationData
 import TelegramStringFormatting
 import ChatTimerScreen
+import ChatHistorySummaryScreen
 import NotificationPeerExceptionController
 
 func archiveContextMenuItems(context: AccountContext, group: EngineChatList.Group, chatListController: ChatListControllerImpl?) -> Signal<[ContextMenuItem], NoError> {
@@ -80,7 +81,23 @@ private func chatContextMenuPeerIsMuted(peer: EnginePeer, notificationSettings: 
     }
 }
 
-func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoInfo: ChatListNodeEntryPromoInfo?, source: ChatContextMenuSource, chatListController: ChatListControllerImpl?, joined: Bool) -> Signal<[ContextMenuItem], NoError> {
+func canDisplayMockChatHistorySummary(
+    isInternalBuild: Bool,
+    isEnabled: Bool,
+    isChatListSource: Bool,
+    hasUnreadMessages: Bool,
+    isCommunity: Bool,
+    isPromo: Bool
+) -> Bool {
+    return isInternalBuild
+        && isEnabled
+        && isChatListSource
+        && hasUnreadMessages
+        && !isCommunity
+        && !isPromo
+}
+
+func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoInfo: ChatListNodeEntryPromoInfo?, source: ChatContextMenuSource, chatListController: ChatListControllerImpl?, joined: Bool, summaryPreviewMessageIds: [EngineMessage.Id] = []) -> Signal<[ContextMenuItem], NoError> {
     let presentationData = context.sharedContext.currentPresentationData.with({ $0 })
     let strings = presentationData.strings
 
@@ -271,7 +288,7 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                                     updatedItems.append(.action(ContextMenuActionItem(text: strings.ChatList_Context_Back, icon: { theme in
                                         return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Back"), color: theme.contextMenu.primaryColor)
                                     }, iconPosition: .left, action: { c, _ in
-                                        c?.setItems(chatContextMenuItems(context: context, peerId: peerId, promoInfo: promoInfo, source: source, chatListController: chatListController, joined: joined) |> map { ContextController.Items(content: .list($0)) }, minHeight: nil, animated: true)
+                                        c?.setItems(chatContextMenuItems(context: context, peerId: peerId, promoInfo: promoInfo, source: source, chatListController: chatListController, joined: joined, summaryPreviewMessageIds: summaryPreviewMessageIds) |> map { ContextController.Items(content: .list($0)) }, minHeight: nil, animated: true)
                                     })))
                                     updatedItems.append(.separator)
                                     
@@ -367,6 +384,67 @@ func chatContextMenuItems(context: AccountContext, peerId: EnginePeer.Id, promoI
                         }
                         
                         if !isCommunity {
+                            let isChatListSource: Bool
+                            if case .chatList = source {
+                                isChatListSource = true
+                            } else {
+                                isChatListSource = false
+                            }
+                            if canDisplayMockChatHistorySummary(
+                                isInternalBuild: context.sharedContext.applicationBindings.appBuildType == .internal,
+                                isEnabled: context.sharedContext.immediateExperimentalUISettings.mockChatHistorySummary,
+                                isChatListSource: isChatListSource,
+                                hasUnreadMessages: readCounters.count > 0,
+                                isCommunity: isCommunity,
+                                isPromo: promoInfo != nil
+                            ) {
+                                items.append(.action(ContextMenuActionItem(
+                                    text: strings.ChatList_HistorySummary_Menu,
+                                    icon: { theme in
+                                        return generateTintedImage(
+                                            image: UIImage(bundleImageName: "Chat/Context Menu/Translate"),
+                                            color: theme.contextMenu.primaryColor
+                                        )
+                                    },
+                                    action: { c, _ in
+                                        c?.dismiss(completion: {
+                                            let request = ChatHistorySummaryRequest(
+                                                peerId: peerId,
+                                                threadId: nil,
+                                                unreadCount: readCounters.count,
+                                                previewMessageIds: summaryPreviewMessageIds
+                                            )
+                                            let controller = ChatHistorySummaryScreen(
+                                                context: context,
+                                                peerTitle: peer.displayTitle(
+                                                    strings: presentationData.strings,
+                                                    displayOrder: presentationData.nameDisplayOrder
+                                                ),
+                                                request: request,
+                                                provider: MockChatHistorySummaryProvider(),
+                                                openMessage: { [weak chatListController] messageId in
+                                                    guard let navigationController = chatListController?.navigationController as? NavigationController else {
+                                                        return
+                                                    }
+                                                    context.sharedContext.navigateToChatController(NavigateToChatControllerParams(
+                                                        navigationController: navigationController,
+                                                        context: context,
+                                                        chatLocation: .peer(peer),
+                                                        subject: .message(
+                                                            id: .id(messageId),
+                                                            highlight: ChatControllerSubject.MessageHighlight(quote: nil),
+                                                            timecode: nil,
+                                                            setupReply: false
+                                                        ),
+                                                        keepStack: .always
+                                                    ))
+                                                }
+                                            )
+                                            chatListController?.present(controller, in: .window(.root))
+                                        })
+                                    }
+                                )))
+                            }
                             if isUnread {
                                 items.append(.action(ContextMenuActionItem(text: strings.ChatList_Context_MarkAsRead, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/MarkAsRead"), color: theme.contextMenu.primaryColor) }, action: { _, f in
                                     let _ = context.engine.messages.togglePeersUnreadMarkInteractively(peerIds: [peerId], setToValue: nil).startStandalone()

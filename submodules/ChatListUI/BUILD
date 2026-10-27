@@ -85,6 +85,7 @@ swift_library(
         "//submodules/TelegramUI/Components/ForumCreateTopicScreen:ForumCreateTopicScreen",
         "//submodules/TelegramUI/Components/ChatTitleView",
         "//submodules/TelegramUI/Components/ChatTimerScreen",
+        "//submodules/TelegramUI/Components/Chat/ChatHistorySummaryScreen",
         "//submodules/TelegramUI/Components/NotificationPeerExceptionController",
         "//submodules/AnimationUI:AnimationUI",
         "//submodules/PeerInfoUI",

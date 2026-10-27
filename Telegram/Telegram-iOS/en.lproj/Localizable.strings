@@ -15726,6 +15726,18 @@ Error: %8$@";
 
 "Conversation.Summary.Limit.Title" = "AI Summary";
 "Conversation.Summary.Limit.Text" = "Summarize large messages with AI – unlimited with Telegram Premium.";
+"ChatList.HistorySummary.Menu" = "Unread Summary";
+"ChatList.HistorySummary.Title" = "Unread Summary";
+"ChatList.HistorySummary.Loading" = "Preparing a short summary…";
+"ChatList.HistorySummary.Overview" = "Overview";
+"ChatList.HistorySummary.KeyPoints" = "Key Points";
+"ChatList.HistorySummary.Decisions" = "Decisions";
+"ChatList.HistorySummary.ActionItems" = "Action Items";
+"ChatList.HistorySummary.Empty" = "There are no messages to summarize.";
+"ChatList.HistorySummary.Error" = "The demo summary could not be prepared.";
+"ChatList.HistorySummary.Retry" = "Try Again";
+"ChatList.HistorySummary.DemoNotice" = "Demo: this summary uses test data and was not sent to a server.";
+"ChatList.HistorySummary.CoveredMessages" = "Covered messages: %@";
 
 "Appearance.SendWithCmdEnter" = "Send Messages with ⌘+Enter";
 
